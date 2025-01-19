@@ -40,7 +40,7 @@ async def save_hubspot_credentials(user_id: str, org_id: str, tokens: HubspotCre
     """
     Save HubSpot tokens to Redis.
     Args:
-        user_id: The user's ID
+        user_id: The user's ID(Who is loggedin)
         org_id: The organization's ID
         tokens: The HubSpot credentials to store
     """
@@ -61,9 +61,10 @@ async def authorize_hubspot(user_id: str, org_id: str) -> str:
         "redirect_uri": HUBSPOT_REDIRECT_URI,
         "scope": " ".join(HUBSPOT_SCOPES),
         "state": f"{user_id}:{org_id}",
-    }
+    }   
+    '''Encodes the required OAuth parameters (client ID, redirect URI, scopes, and state) into a URL'''
     return f"{HUBSPOT_AUTH_URL}?{urlencode(query_params)}"
-
+'''Uses a refresh token to request a new access token.'''
 async def refresh_hubspot_token(refresh_token: str) -> HubspotCredentials:
     """
     Refresh HubSpot access token using refresh token.
@@ -76,6 +77,7 @@ async def refresh_hubspot_token(refresh_token: str) -> HubspotCredentials:
     """
     async with httpx.AsyncClient() as client:
         try:
+            '''POST Request'''
             response = await client.post(
                 HUBSPOT_TOKEN_URL,
                 data={
@@ -94,7 +96,7 @@ async def refresh_hubspot_token(refresh_token: str) -> HubspotCredentials:
                 status_code=response.status_code if hasattr(e, 'response') else 500,
                 detail=f"Error refreshing token: {str(e)}"
             )
-
+'''Attempts to fetch user credentials from Redis. Raises a 404 error if not found.'''
 async def get_hubspot_credentials(user_id: str, org_id: str) -> HubspotCredentials:
     """
     Retrieve stored HubSpot credentials for a user and organization.
@@ -125,7 +127,7 @@ async def get_hubspot_credentials(user_id: str, org_id: str) -> HubspotCredentia
             raise
 
     return credentials
-
+'''Retrieves a list of HubSpot contacts via API.'''
 async def get_items_hubspot(credentials: HubspotCredentials) -> List[IntegrationItem]:
     """
     Fetch items from HubSpot using API endpoints with pagination support.
@@ -143,6 +145,7 @@ async def get_items_hubspot(credentials: HubspotCredentials) -> List[Integration
     async with httpx.AsyncClient() as client:
         while True:
             try:
+                '''Makes paginated API calls to fetch 100 contacts at a time.'''
                 url = f"{HUBSPOT_API_BASE_URL}/crm/v3/objects/contacts"
                 params = {"limit": 100}
                 if after:
@@ -193,7 +196,7 @@ async def fetch_credentials_from_db(user_id: str, org_id: str, integration: str)
         except json.JSONDecodeError:
             return None
     return None
-
+'''Handles the OAuth2 callback, exchanges the authorization code for tokens, and stores them.'''
 async def oauth2callback_hubspot(request: Request) -> HTMLResponse:
     """
     Handle OAuth2 callback from HubSpot
@@ -237,7 +240,7 @@ async def oauth2callback_hubspot(request: Request) -> HTMLResponse:
                 status_code=response.status_code if hasattr(e, 'response') else 500,
                 detail=f"Error in OAuth callback: {str(e)}"
             )
-
+'''Converts raw contact data into a structured IntegrationItem format, containing metadata like name, creation time, and URL.'''
 async def create_integration_item_metadata_object(contact: Dict[str, Any]) -> IntegrationItem:
     """Convert HubSpot contact to IntegrationItem format"""
     properties = contact.get('properties', {})
